@@ -1,0 +1,1503 @@
+openapi: 3.0.3
+info:
+  title: Tugas ABL Backend API
+  version: 1.0.0
+  description: |
+    Dokumentasi OpenAPI untuk Backend API peminjaman ruangan.
+    
+    Catatan:
+    - Beberapa skema request/response disusun berdasarkan model dan konvensi Laravel umum.
+    - Sesuaikan contoh (example) bila format aktual berbeda di controller.
+  contact:
+    name: API Support
+    email: support@example.com
+servers:
+  - url: http://localhost:8000/api
+    description: Server lokal Laravel (php artisan serve)
+  - url: https://api.example.com/api
+    description: Server produksi (placeholder)
+
+tags:
+  - name: Auth
+    description: Autentikasi dan sesi pengguna
+  - name: Bookings
+    description: Peminjaman ruangan
+  - name: Reports
+    description: Pengaduan/keluhan
+  - name: Reviews
+    description: Ulasan ruangan/CS
+  - name: MasterData
+    description: Master data (rooms, booking-categories, buildings, facilities,  cs-staff)
+  - name: External
+    description: Integrasi eksternal (TMDB)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
+    APIKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  responses:
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example: { message: Unauthorized }
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example: { message: Forbidden }
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example: { message: Resource not found }
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example: { message: Conflict }
+    InvalidApiKey:
+      description: Invalid API key
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+          example: { message: Invalid API key }
+    ValidationError:
+      description: Unprocessable Entity
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+          example:
+            message: Validasi gagal
+            errors:
+              field: ["Pesan kesalahan"]
+  schemas:
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        phone_number: { type: string, nullable: true }
+        role: { type: string, description: Role pengguna }
+        email_verified_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time, nullable: true }
+        updated_at: { type: string, format: date-time, nullable: true }
+      required: [id, name, email, role]
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+    ApiError:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+    ValidationError:
+      type: object
+      properties:
+        message: { type: string }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+      required: [message, errors]
+    Building:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        created_at: {type: string, format: date-time, nullable: true}
+        updated_at: {type: string, format: date-time, nullable: true}
+      required: [name]
+    Facility:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        created_at: {type: string, format: date-time, nullable: true}
+        updated_at: {type: string, format: date-time, nullable: true}
+      required: [name]
+    CsStaff:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        phone_number: {type: string}
+        created_at: {type: string, format: date-time, nullable: true}
+        updated_at: {type: string, format: date-time, nullable: true}
+      required: [name, phone_number]
+    Room:
+      type: object
+      properties:
+        id: {type: integer}
+        building_id: {type: integer}
+        cs_staff_id: {type: integer, nullable: true}
+        name: {type: string}
+        code: {type: string}
+        capacity: {type: integer}
+        status:
+          type: string
+          description: Status ruangan
+          enum: [available, unavailable]
+        created_at: {type: string, format: date-time, nullable: true}
+        updated_at: {type: string, format: date-time, nullable: true}
+        deleted_at: {type: string, format: date-time, nullable: true}
+      required: [building_id, name, code, capacity]
+    BookingCategory:
+      type: object
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        description: {type: string, nullable: true}
+        created_at: {type: string, format: date-time, nullable: true}
+        updated_at: {type: string, format: date-time, nullable: true}
+      required: [name]
+    Booking:
+      type: object
+      description: |
+        Validasi:
+        - `room_id` dan `booking_category_id` harus valid.
+        - `start_time` wajib dan `end_time` harus setelah `start_time`.
+        - `surat_pinjam` dan `rundown` wajib berupa file (pdf/jpg/png/doc/docx) maksimal 2MB.
+        - Field lain mengikuti tipe yang disebutkan; jika tidak valid akan 422.
+      properties:
+        id: {type: integer}
+        user_id: {type: integer}
+        room_id: {type: integer}
+        booking_category_id: {type: integer}
+        activity_name: {type: string}
+        instance_name: {type: string}
+        participants_count: {type: integer}
+        start_time: {type: string, format: date-time}
+        end_time: {type: string, format: date-time}
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        reason_for_rejection: {type: string, nullable: true}
+        surat_pinjam_path: {type: string, nullable: true}
+        rundown_path: {type: string, nullable: true}
+        disposisi_path: {type: string, nullable: true}
+        created_at: {type: string, format: date-time, nullable: true}
+        updated_at: {type: string, format: date-time, nullable: true}
+      required: [user_id, room_id, booking_category_id, activity_name, instance_name, start_time, end_time]
+    Report:
+      type: object
+      description: |
+        Validasi:
+        - `room_id` wajib dan harus ada (`exists:rooms,id`).
+        - `title` dan `description` wajib diisi.
+        - `proof` opsional, tetapi jika dikirim harus berupa gambar (`image`) berukuran maksimal 2MB.
+      properties:
+        id: {type: integer}
+        user_id: {type: integer}
+        room_id: {type: integer}
+        title: {type: string}
+        description: {type: string}
+        proof_path: {type: string, nullable: true}
+        status:
+          type: string
+          enum: [pending, in_progress, resolved]
+        created_at: {type: string, format: date-time, nullable: true}
+        updated_at: {type: string, format: date-time, nullable: true}
+      required: [user_id, room_id, title, description]
+    Review:
+      type: object
+      properties:
+        id: {type: integer}
+        user_id: {type: integer}
+        booking_id: {type: integer}
+        room_id: {type: integer}
+        rating_room: {type: integer, minimum: 1, maximum: 5}
+        comment_room: {type: string, nullable: true}
+        rating_cs: {type: integer, minimum: 1, maximum: 5}
+        comment_cs: {type: string, nullable: true}
+        created_at: {type: string, format: date-time, nullable: true}
+        updated_at: {type: string, format: date-time, nullable: true}
+      required: [user_id, booking_id, room_id]
+    RegisterInput:
+      type: object
+      properties:
+        name: {type: string}
+        email: {type: string, format: email}
+        password: {type: string, format: password}
+        phone_number: {type: string, nullable: true}
+      required: [name, email, password]
+    LoginInput:
+      type: object
+      properties:
+        email: {type: string, format: email}
+        password: {type: string, format: password}
+      required: [email, password]
+    AuthResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Pesan status (opsional)
+        token:
+          type: string
+          description: Bearer token dari Sanctum
+        token_type:
+          type: string
+          example: Bearer
+        user:
+          $ref: '#/components/schemas/User'
+      required: [token, user]
+    RegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+      required: [message, user]
+    MutationResponseRoom:
+      type: object
+      properties:
+        message: {type: string}
+        data: {$ref: '#/components/schemas/Room'}
+      required: [message, data]
+    MutationResponseBooking:
+      type: object
+      properties:
+        message: {type: string}
+        data: {$ref: '#/components/schemas/Booking'}
+      required: [message, data]
+    MutationResponseReport:
+      type: object
+      properties:
+        message: {type: string}
+        data: {$ref: '#/components/schemas/Report'}
+      required: [message, data]
+    MutationResponseReview:
+      type: object
+      properties:
+        message: {type: string}
+        data: {$ref: '#/components/schemas/Review'}
+      required: [message, data]
+    MutationResponseBuilding:
+      type: object
+      properties:
+        message: {type: string}
+        data: {$ref: '#/components/schemas/Building'}
+      required: [message, data]
+    MutationResponseFacility:
+      type: object
+      properties:
+        message: {type: string}
+        data: {$ref: '#/components/schemas/Facility'}
+      required: [message, data]
+    MutationResponseCsStaff:
+      type: object
+      properties:
+        message: {type: string}
+        data: {$ref: '#/components/schemas/CsStaff'}
+      required: [message, data]
+    MutationResponseBookingCategory:
+      type: object
+      properties:
+        message: {type: string}
+        data: {$ref: '#/components/schemas/BookingCategory'}
+      required: [message, data]
+
+paths:
+  /register:
+    post:
+      tags: [Auth]
+      summary: Registrasi pengguna baru
+      description: |
+        Access: Public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterResponse' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /login:
+    post:
+      tags: [Auth]
+      summary: Login dan dapatkan token
+      description: |
+        Access: Public
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginInput' }
+      responses:
+        '200':
+          description: Berhasil login
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Akun belum terverifikasi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example:
+                message: Akun belum terverifikasi. Silakan cek email Anda.
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /logout:
+    post:
+      tags: [Auth]
+      summary: Logout dan cabut token
+      description: |
+        Access: Authenticated (Admin and non-admin)
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204':
+          description: Logged out
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /user:
+    get:
+      tags: [Auth]
+      summary: Profil pengguna saat ini
+      description: |
+        Access: Authenticated (Admin and non-admin)
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /rooms:
+    get:
+      tags: [MasterData]
+      summary: Daftar ruangan (publik)
+      description: |
+        Access: Public
+      parameters:
+        - in: query
+          name: building_id
+          schema: { type: integer }
+          description: Filter berdasarkan gedung
+        - in: query
+          name: min_capacity
+          schema: { type: integer }
+          description: Filter minimal kapasitas
+        - in: query
+          name: facilities
+          schema:
+            type: array
+            items: { type: integer }
+          style: form
+          explode: true
+          description: Daftar ID fasilitas (array)
+        - in: query
+          name: start_time
+          schema: { type: string, format: date-time }
+          description: Waktu mulai untuk cek ketersediaan
+        - in: query
+          name: end_time
+          schema: { type: string, format: date-time }
+          description: Waktu selesai untuk cek ketersediaan
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Room' }
+    post:
+      tags: [MasterData]
+      summary: Tambah ruangan (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                building_id: {type: integer}
+                cs_staff_id: {type: integer, nullable: true}
+                name: {type: string}
+                code: {type: string}
+                capacity: {type: integer}
+                status: {type: string, enum: [available, unavailable]}
+              required: [building_id, name, code, capacity]
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MutationResponseRoom' }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /rooms/{id}:
+    get:
+      tags: [MasterData]
+      summary: Detail ruangan (publik)
+      description: |
+        Access: Public
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Room'
+                  - type: object
+                    properties:
+                      average_rating_room: { type: number, format: float, nullable: true }
+                      average_rating_cs: { type: number, format: float, nullable: true }
+                      reviews_count: { type: integer }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [MasterData]
+      summary: Ubah ruangan (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                building_id: {type: integer}
+                cs_staff_id: {type: integer, nullable: true}
+                name: {type: string}
+                code: {type: string}
+                capacity: {type: integer}
+                status: {type: string, enum: [available, unavailable]}
+    
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MutationResponseRoom' }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [MasterData]
+      summary: Hapus ruangan (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /booking-categories:
+    get:
+      tags: [MasterData]
+      summary: Daftar kategori booking
+      description: |
+        Access: Public
+      parameters: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BookingCategory' }
+    post:
+      tags: [MasterData]
+      summary: Tambah kategori (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                description: {type: string, nullable: true}
+              required: [name]
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseBookingCategory' } } } }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /booking-categories/{id}:
+    get:
+      tags: [MasterData]
+      summary: Detail kategori (publik)
+      description: |
+        Access: Public
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/BookingCategory' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [MasterData]
+      summary: Ubah kategori (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                description: {type: string, nullable: true}
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseBookingCategory' } } } }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [MasterData]
+      summary: Hapus kategori (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: integer}
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /buildings:
+    get:
+      tags: [MasterData]
+      summary: Daftar gedung (publik)
+      description: |
+        Access: Public
+      parameters: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Building' }
+    post:
+      tags: [MasterData]
+      summary: Tambah gedung (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+              required: [name]
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseBuilding' } } } }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /buildings/{id}:
+    get:
+      tags: [MasterData]
+      summary: Detail gedung (publik)
+      description: |
+        Access: Public
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Building' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [MasterData]
+      summary: Ubah gedung (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { name: {type: string} } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseBuilding' } } } }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [MasterData]
+      summary: Hapus gedung (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /facilities:
+    get:
+      tags: [MasterData]
+      summary: Daftar fasilitas (publik)
+      description: |
+        Access: Public
+      parameters: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Facility' }
+    post:
+      tags: [MasterData]
+      summary: Tambah fasilitas (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { name: {type: string} }, required: [name] }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseFacility' } } } }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /facilities/{id}:
+    get:
+      tags: [MasterData]
+      summary: Detail fasilitas (publik)
+      description: |
+        Access: Public
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Facility' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [MasterData]
+      summary: Ubah fasilitas (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { name: {type: string} } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseFacility' } } } }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [MasterData]
+      summary: Hapus fasilitas (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /cs-staff:
+    get:
+      tags: [MasterData]
+      summary: Daftar CS (publik)
+      description: |
+        Access: Public
+      parameters: []
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/CsStaff' } } } } }
+    post:
+      tags: [MasterData]
+      summary: Tambah CS (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { name: {type: string}, phone_number: {type: string} }, required: [name, phone_number] }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseCsStaff' } } } }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /cs-staff/{id}:
+    get:
+      tags: [MasterData]
+      summary: Detail CS (publik)
+      description: |
+        Access: Public
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CsStaff' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [MasterData]
+      summary: Ubah CS (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { name: {type: string}, phone_number: {type: string} } }
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseCsStaff' } } } }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [MasterData]
+      summary: Hapus CS (API key)
+      description: |
+        Access: Admin only (API key)
+      security: [{ APIKeyAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/InvalidApiKey' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /email/verification-notification:
+    post:
+      tags: [Auth]
+      summary: Kirim ulang verifikasi (publik)
+      description: |
+        Access: Public
+        Endpoint publik untuk mengirim ulang email verifikasi; dibatasi throttle (maks 6/menit).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+              required: [email]
+      responses:
+        '200':
+          description: Email verifikasi telah dikirim
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageResponse' }
+              example:
+                message: Email verifikasi telah dikirim
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example:
+                message: Too Many Attempts.
+  /verify-email/{id}/{hash}:
+    get:
+      tags: [Auth]
+      summary: Verifikasi email melalui tautan bertanda (signed)
+      description: |
+        Access: Public
+        Endpoint publik dengan URL bertanda (signed); tidak memerlukan token.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: hash
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Email berhasil diverifikasi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageResponse' }
+              example:
+                message: Email berhasil diverifikasi
+        '400':
+          description: Tautan verifikasi tidak valid
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example:
+                message: Tautan verifikasi tidak valid
+        '409':
+          description: Email sudah terverifikasi sebelumnya
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example:
+                message: Email sudah terverifikasi
+
+  /bookings:
+    get:
+      tags: [Bookings]
+      summary: Daftar semua booking (admin)
+      description: |
+        Access: Admin only
+        Hanya admin yang dapat mengakses daftar global booking. Non-admin akan menerima 403 Forbidden.
+      security: [{ BearerAuth: [] }]
+      parameters: []
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Booking' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Bookings]
+      summary: Buat booking baru
+      description: |
+        Access: Non-admin only (peminjam)
+        Hanya peminjam (non-admin) yang boleh membuat booking.
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                room_id: {type: integer}
+                booking_category_id: {type: integer}
+                activity_name: {type: string}
+                instance_name: {type: string}
+                participants_count: {type: integer}
+                start_time: {type: string, format: date-time}
+                end_time: {type: string, format: date-time}
+                surat_pinjam:
+                  type: string
+                  format: binary
+                rundown:
+                  type: string
+                  format: binary
+              required: [room_id, booking_category_id, activity_name, instance_name, participants_count, start_time, end_time, surat_pinjam, rundown]
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseBooking' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Forbidden: Hanya peminjam (non-admin) yang boleh membuat booking" }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /users/{id}/bookings:
+    get:
+      tags: [Bookings]
+      summary: Daftar booking milik user tertentu
+      description: |
+        Access: Admin or owner
+        Hanya pemilik data atau admin yang dapat mengakses daftar booking pengguna ini. Selain itu akan menerima 403 Forbidden.
+        Mengembalikan 404 Not Found jika user target tidak ditemukan.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Booking' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Unauthorized: Anda tidak boleh melihat booking user lain" }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /bookings/{id}:
+    get:
+      tags: [Bookings]
+      summary: Detail booking
+      description: |
+        Access: Admin or owner
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Booking' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Unauthorized: Anda tidak boleh melihat booking orang lain" }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Bookings]
+      summary: Batalkan/hapus booking
+      description: |
+        Access: Admin or owner
+        Hanya booking dengan status pending yang boleh dibatalkan. Jika status bukan pending, akan mengembalikan 403 Forbidden.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              examples:
+                not_owner:
+                  summary: Bukan admin/pemilik booking
+                  value: { message: "Unauthorized: Anda tidak boleh menghapus booking orang lain" }
+                not_pending:
+                  summary: Status bukan pending
+                  value: { message: "Hanya booking pending yang bisa dibatalkan" }
+  /bookings/{id}/status:
+    put:
+      tags: [Bookings]
+      summary: Ubah status booking
+      description: |
+        Access: Admin only
+        Mengubah status booking menjadi approved atau rejected.
+        - Saat disetujui (approved), sistem akan otomatis menolak (rejected) semua booking lain yang bentrok pada ruangan dan waktu yang sama.
+        - Field `auto_rejected_count` menunjukkan jumlah booking pending yang otomatis ditolak akibat konflik waktu.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string, example: approved}
+                reason: {type: string, nullable: true, description: Alasan wajib saat status=rejected}
+              required: [status]
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: {type: string}
+                  data: { $ref: '#/components/schemas/Booking' }
+                  auto_rejected_count: { type: integer }
+                required: [message, data]
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Forbidden: Hanya admin yang boleh mengubah status booking" }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Gagal Approve: Ruangan sudah resmi dipakai kegiatan lain di jam tersebut!" }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /bookings/{id}/disposisi:
+    post:
+      tags: [Bookings]
+      summary: Upload file disposisi untuk booking
+      description: |
+        Access: Admin only
+        Hanya dapat mengupload jika status booking adalah approved. Jika belum disetujui, akan mengembalikan 403 Forbidden.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                disposisi:
+                  type: string
+                  format: binary
+              required: [disposisi]
+      responses:
+        '200':
+          description: File diunggah
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MutationResponseBooking' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              examples:
+                not_admin:
+                  summary: Bukan admin
+                  value: { message: "Forbidden: Hanya admin yang boleh mengunggah disposisi" }
+                not_approved:
+                  summary: Booking belum disetujui
+                  value: { message: "Gagal: Booking belum disetujui!" }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /reports:
+    get:
+      tags: [Reports]
+      summary: Daftar semua laporan (admin)
+      description: |
+        Access: Admin only
+        Hanya admin yang dapat mengakses daftar global laporan. Non-admin akan menerima 403 Forbidden.
+      security: [{ BearerAuth: [] }]
+      parameters: []
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Report' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Reports]
+      summary: Buat laporan baru
+      description: |
+        Access: Non-admin only (peminjam)
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                room_id: {type: integer}
+                title: {type: string}
+                description: {type: string}
+                proof:
+                  type: string
+                  format: binary
+                  description: Bukti gambar (opsional)
+              required: [room_id, title, description]
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseReport' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Forbidden: Hanya peminjam (non-admin) yang boleh membuat laporan" }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /users/{id}/reports:
+    get:
+      tags: [Reports]
+      summary: Daftar laporan milik user tertentu
+      description: |
+        Access: Admin or owner
+        Hanya pemilik data atau admin yang dapat mengakses daftar laporan pengguna ini. Selain itu akan menerima 403 Forbidden.
+        Mengembalikan 404 Not Found jika user target tidak ditemukan.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Report' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Unauthorized: Anda tidak boleh melihat laporan user lain" }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /reports/{id}:
+    get:
+      tags: [Reports]
+      summary: Detail laporan
+      description: |
+        Access: Admin or owner
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Report' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Unauthorized: Anda tidak boleh melihat laporan orang lain" }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /reports/{id}/status:
+    put:
+      tags: [Reports]
+      summary: Ubah status laporan
+      description: |
+        Access: Admin only
+        Hanya admin yang dapat mengubah status laporan. Non-admin akan menerima 403 Forbidden.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: {type: string, example: resolved}
+              required: [status]
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseReport' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Forbidden: Hanya admin yang boleh mengubah status laporan" }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /reviews:
+    get:
+      tags: [Reviews]
+      summary: Daftar review (admin)
+      description: |
+        Access: Admin only
+        Hanya admin yang dapat mengakses daftar global review. Non-admin akan menerima 403 Forbidden.
+      security: [{ BearerAuth: [] }]
+      parameters: []
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Review' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Reviews]
+      summary: Tambah review
+      description: |
+        Access: Owner only (booking owner)
+        Aturan dan validasi:
+        - Hanya pemilik booking yang boleh mengirim ulasan (403 jika bukan pemilik).
+        - Booking harus berstatus approved (403 jika belum disetujui).
+        - Satu booking hanya boleh memiliki satu ulasan (409 jika duplikat).
+        - Validasi rating: integer 1..5; komentar maksimal 1000 karakter.
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                booking_id: {type: integer}
+                rating_room: {type: integer, minimum: 1, maximum: 5}
+                comment_room: {type: string, nullable: true}
+                rating_cs: {type: integer, minimum: 1, maximum: 5}
+                comment_cs: {type: string, nullable: true}
+              required: [booking_id, rating_room, rating_cs]
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseReview' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              examples:
+                not_owner:
+                  summary: Bukan pemilik booking
+                  value: { message: "Unauthorized: Ini bukan peminjaman Anda" }
+                not_approved:
+                  summary: Booking belum disetujui
+                  value: { message: "Hanya peminjaman yang disetujui yang bisa diulas" }
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Anda sudah mengulas peminjaman ini" }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /users/{id}/reviews:
+    get:
+      tags: [Reviews]
+      summary: Daftar review milik user tertentu
+      description: |
+        Access: Admin or owner
+        Hanya pemilik data atau admin yang dapat mengakses daftar review pengguna ini. Selain itu akan menerima 403 Forbidden.
+        Mengembalikan 404 Not Found jika user target tidak ditemukan.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Review' } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Unauthorized: Anda tidak boleh melihat ulasan user lain" }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /rooms/{id}/reviews:
+    get:
+      tags: [Reviews]
+      summary: Daftar review untuk ruangan tertentu (publik)
+      description: |
+        Access: Public
+        Mengembalikan daftar review untuk ruangan. Jika ruangan tidak ditemukan akan mengembalikan 404 Not Found.
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Review' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /reviews/{id}:
+    get:
+      tags: [Reviews]
+      summary: Detail review
+      description: |
+        Access: Admin or owner
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Review' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Unauthorized: Anda tidak boleh melihat ulasan orang lain" }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Reviews]
+      summary: Ubah review (owner)
+      description: |
+        Access: Owner only
+        Hanya pemilik review yang dapat mengubah. Field yang tidak dikirim tidak diubah.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating_room: {type: integer, minimum: 1, maximum: 5}
+                comment_room: {type: string, nullable: true}
+                rating_cs: {type: integer, minimum: 1, maximum: 5}
+                comment_cs: {type: string, nullable: true}
+              description: Semua field opsional; kirim hanya yang diubah.
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/MutationResponseReview' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Forbidden: Hanya pemilik ulasan yang boleh mengubah" }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Reviews]
+      summary: Hapus review (admin/owner)
+      description: |
+        Access: Admin or owner
+        Admin dapat menghapus semua review. Pemilik review dapat menghapus review miliknya. Selain itu akan menerima 403 Forbidden.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: "Forbidden: Anda tidak boleh menghapus ulasan orang lain" }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /users/{id}:
+    put:
+      tags: [Auth]
+      summary: Update profil pengguna (by id)
+      description: |
+        Access: Admin or owner
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { in: path, name: id, required: true, schema: {type: integer} }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                email: {type: string, format: email}
+                phone_number: {type: string}
+                password: {type: string, format: password}
+                role: {type: string}
+      responses:
+        '200': { description: Updated, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /movies/search:
+    get:
+      tags: [External]
+      summary: Cari film di TMDB
+      description: |
+        Access: Authenticated (Admin and non-admin)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: query
+          name: search
+          required: true
+          schema: { type: string }
+          description: Kata kunci pencarian film
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        title: { type: string }
+                        overview: { type: string }
+                        release_date: { type: string }
+                        poster_path: { type: string, nullable: true }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '502':
+          description: Bad Gateway (TMDB upstream error)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: 'Gagal mengambil data dari server TMDB' }
+
+  /movies/{id}:
+    get:
+      tags: [External]
+      summary: Detail film dari TMDB
+      description: |
+        Access: Authenticated (Admin and non-admin)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: integer }
+                  title: { type: string }
+                  overview: { type: string }
+                  release_date: { type: string }
+                  runtime: { type: integer, nullable: true }
+                  genres:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        name: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502':
+          description: Bad Gateway (TMDB upstream error)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+              example: { message: 'Gagal mengambil data dari server TMDB' }
