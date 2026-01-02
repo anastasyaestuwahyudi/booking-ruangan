@@ -11,6 +11,7 @@ use App\Http\Controllers\FacilityController;
 use App\Http\Controllers\CsStaffController;
 use App\Http\Controllers\BookingCategoryController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\AuthVerificationController;
 use App\Http\Controllers\ExternalMovieController;
  
@@ -24,6 +25,7 @@ Route::post('/email/verification-notification', [AuthVerificationController::cla
     ->middleware('throttle:6,1');
 
 Route::apiResource('rooms', RoomController::class)->only(['index', 'show']);
+Route::get('/rooms/{id}/reviews', [ReviewController::class, 'roomReviews']);
 
 Route::apiResource('buildings', BuildingController::class)->only(['index', 'show']);
 Route::apiResource('facilities', FacilityController::class)->only(['index', 'show']);
@@ -47,6 +49,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/bookings/{id}/status', [BookingController::class, 'updateStatus']);
     Route::post('/bookings/{id}/disposisi', [BookingController::class, 'uploadDisposisi']);
     Route::delete('/bookings/{id}', [BookingController::class, 'destroy']);
+
+
+    Route::get('/reviews', [ReviewController::class, 'index']);
+    Route::post('/reviews', [ReviewController::class, 'store']);
+    Route::get('/users/{id}/reviews', [ReviewController::class, 'myReviews']);
+    Route::get('/reviews/{id}', [ReviewController::class, 'show']);
+    Route::put('/reviews/{id}', [ReviewController::class, 'update']);
+    Route::delete('/reviews/{id}', [ReviewController::class, 'destroy']);
 
     Route::get('/movies/search', [ExternalMovieController::class, 'index']);
     Route::get('/movies/{id}', [ExternalMovieController::class, 'show']);
