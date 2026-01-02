@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\BookingController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\BuildingController;
 use App\Http\Controllers\FacilityController;
 use App\Http\Controllers\CsStaffController;
@@ -50,6 +51,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/bookings/{id}/disposisi', [BookingController::class, 'uploadDisposisi']);
     Route::delete('/bookings/{id}', [BookingController::class, 'destroy']);
 
+
+    Route::post('/reports', [ReportController::class, 'store']);
+    Route::get('/reports', [ReportController::class, 'index']);
+    Route::get('/users/{id}/reports', [ReportController::class, 'myReports']);
+    Route::get('/reports/{id}', [ReportController::class, 'show']);
+    Route::put('/reports/{id}/status', [ReportController::class, 'updateStatus']);
 
     Route::get('/reviews', [ReviewController::class, 'index']);
     Route::post('/reviews', [ReviewController::class, 'store']);
